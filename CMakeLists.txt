@@ -183,6 +183,7 @@ set (raja_sources
   src/MemUtils_CUDA.cpp
   src/MemUtils_HIP.cpp
   src/MemUtils_SYCL.cpp
+  src/PapiUtils.cpp
   src/PluginStrategy.cpp)
 
 if (RAJA_ENABLE_RUNTIME_PLUGINS)

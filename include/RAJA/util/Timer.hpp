@@ -26,6 +26,10 @@
 #include <caliper/Annotation.h>
 #endif
 
+#if defined(RAJA_ENABLE_OPENMP) && defined(RUN_OPENMP)
+#include <omp.h>
+#endif
+
 
 // libstdc++ on BGQ only has gettimeofday for some reason
 #if defined(__bgq__) && (!defined(_LIBCPP_VERSION))
@@ -109,27 +113,74 @@ private:
   using DurationType = std::chrono::duration<ElapsedType>;
 
 public:
-  ChronoTimer() : tstart(ClockType::now()), tstop(ClockType::now()), telapsed(0)
+  ChronoTimer() : tstart(ClockType::now()), tstop(ClockType::now()), telapsed(0), paused(false)
   {
   }
 
-  void start() { tstart = ClockType::now(); }
+  void start()
+  {
+    #if defined(RAJA_ENABLE_OPENMP) && defined(RUN_OPENMP)
+    int tid = omp_get_thread_num();
+    #else
+    int tid = 0;
+    #endif
+    if (tid == 0) {
+      if (paused)
+      { tstart = tstart + (ClockType::now() - tpause); paused = false; }
+      else
+      { tstart = ClockType::now(); }
+    }
+  }
 
   void stop()
   {
-    tstop = ClockType::now();
-    telapsed +=
-        std::chrono::duration_cast<DurationType>(tstop - tstart).count();
+    #if defined(RAJA_ENABLE_OPENMP) && defined(RUN_OPENMP)
+    int tid = omp_get_thread_num();
+    #else
+    int tid = 0;
+    #endif
+    if (tid == 0) {
+      if (paused)
+      { tstop = tpause; paused = false; }
+      else
+      { tstop = ClockType::now(); }
+      telapsed +=
+          std::chrono::duration_cast<DurationType>(tstop - tstart).count();
+    }
+  }
+
+  void pause() {
+    #if defined(RAJA_ENABLE_OPENMP) && defined(RUN_OPENMP)
+    int tid = omp_get_thread_num();
+    #else
+    int tid = 0;
+    #endif
+    if (tid == 0) {
+      tpause = ClockType::now();
+      paused = true;
+    }
   }
 
   ElapsedType elapsed() const { return telapsed; }
 
-  void reset() { telapsed = 0; }
+  void reset() {
+    #if defined(RAJA_ENABLE_OPENMP) && defined(RUN_OPENMP)
+    int tid = omp_get_thread_num();
+    #else
+    int tid = 0;
+    #endif
+    if (tid == 0) {
+      telapsed = 0;
+      paused = false;
+    }
+  }
 
 private:
   TimeType tstart;
   TimeType tstop;
+  TimeType tpause;
   ElapsedType telapsed;
+  bool paused;
 };
 
 using TimerBase = ChronoTimer;
@@ -263,6 +314,7 @@ class Timer : public TimerBase
 public:
   using TimerBase::start;
   using TimerBase::stop;
+  using TimerBase::pause;
 
 #if defined(RAJA_USE_CALIPER)
   void start(const char* name) { cali::Annotation(name).begin(); }
