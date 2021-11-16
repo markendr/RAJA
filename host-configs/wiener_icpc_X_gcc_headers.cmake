@@ -8,11 +8,16 @@
 set(RAJA_COMPILER "RAJA_COMPILER_ICC" CACHE STRING "")
 
 option(RAJA_USE_PAPI "Enable PAPI performance monitoring" OFF)
+option(CHECK_PAPI_ERRORS "Enable PAPI error checking" ON)
 
 if(RAJA_USE_PAPI)
   message("PAPI enabled")
   set(COMMON_FLAGS "${COMMON_FLAGS} -DRAJA_USE_PAPI -I$ENV{HOME}/papi/include")
   set(CMAKE_EXE_LINKER_FLAGS "-lpapi -L$ENV{HOME}/papi/lib" CACHE STRING "")
+  if(CHECK_PAPI_ERRORS)
+    message("PAPI error checking enabled")
+    set(COMMON_FLAGS "${COMMON_FLAGS} -DCHECK_PAPI_ERRORS")
+  endif()
 endif()
 
 set(CMAKE_CXX_FLAGS_RELEASE "${COMMON_FLAGS} -O3 -march=native -ansi-alias -diag-disable cpu-dispatch" CACHE STRING "")
